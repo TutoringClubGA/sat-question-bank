@@ -1,0 +1,124 @@
+<!doctype html>
+<!-- Hello! From John -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAT Practice Question Bank Database</title>
+<link rel="stylesheet" href="./style.css">
+<script src="./app.js" defer></script>
+</head>
+<body>
+<small class="app-version">v1.16</small>
+<main id="browser">
+  <nav class="section-switcher" aria-label="SAT question bank">
+    <button type="button" aria-controls="reading-writing" aria-pressed="true">Reading &amp; Writing</button>
+    <button type="button" aria-controls="math" aria-pressed="false">Math</button>
+    <button id="open-statistics" type="button" aria-controls="statistics" aria-pressed="false">Database Statistics</button>
+  </nav>
+  <div class="directory-document">
+    <div id="database-dates" class="database-dates" hidden>
+      <div>Last database refresh: <time id="database-updated"></time></div>
+      <div>Most recent change: <time id="database-changed"></time></div>
+    </div>
+    <header id="directory-header" class="directory-header">
+      <h1>SAT Practice Question Bank Database</h1>
+      <div class="release-tools">
+        <button id="filter-release" type="button" aria-haspopup="dialog" aria-controls="picker" aria-expanded="false">Filter by Release</button>
+        <button id="clear-release" class="text-link" type="button" hidden>Clear filter</button>
+      </div>
+      <p id="release-summary" class="meta" role="status">Loading releases…</p>
+    </header>
+    <p id="error" role="alert" hidden></p>
+    <div id="directory"></div>
+    <section id="statistics" aria-label="Database Statistics" hidden>
+      <p id="statistics-status" class="meta" role="status">Loading question history…</p>
+      <table id="statistics-table" aria-label="Questions added by change date" hidden>
+        <colgroup><col></colgroup>
+        <colgroup span="3"></colgroup>
+        <thead>
+          <tr><th class="change-date-column" scope="col" rowspan="2">Change date</th><th scope="colgroup" colspan="3">Questions added</th></tr>
+          <tr><th scope="col" aria-label="Reading &amp; Writing">R&amp;W</th><th scope="col">Math</th><th scope="col">Total</th></tr>
+        </thead>
+        <tbody id="statistics-rows"></tbody>
+      </table>
+    </section>
+  </div>
+  <div id="worksheet-bar" class="toolbar worksheet-bar" hidden>
+    <span id="selection-count" aria-live="polite"></span>
+    <button id="clear" class="quiet">Clear</button>
+    <button id="worksheet" class="primary">Print worksheet</button>
+  </div>
+  <span id="worksheet-included-description" hidden>Included in worksheet</span>
+</main>
+<section id="picker" popover="auto" aria-labelledby="picker-title" tabindex="-1">
+  <div class="picker-heading">
+    <div><h2 id="picker-title"></h2><p id="picker-context" class="meta"></p></div>
+    <button id="close-picker" class="quiet" aria-label="Close picker" type="button">×</button>
+  </div>
+  <div id="picker-body">
+    <fieldset id="source-picker" aria-label="Question banks and release months">
+      <div id="source"></div>
+      <details id="earlier-months" hidden>
+        <summary>Earlier months</summary>
+        <div id="earlier-sources"></div>
+      </details>
+      <details id="date-range">
+        <summary>Custom date range</summary>
+        <div class="range-inputs">
+          <div>
+            <span id="date-from-label">From</span>
+            <button id="date-from" class="month-trigger" type="button" aria-labelledby="date-from-label date-from" aria-haspopup="dialog" aria-controls="month-picker" aria-expanded="false">Select month</button>
+          </div>
+          <div>
+            <span id="date-through-label">Through</span>
+            <button id="date-through" class="month-trigger" type="button" aria-labelledby="date-through-label date-through" aria-haspopup="dialog" aria-controls="month-picker" aria-expanded="false">Select month</button>
+          </div>
+        </div>
+        <div id="month-picker" role="dialog" aria-label="Select month" hidden>
+          <div class="month-navigation">
+            <button id="previous-year" type="button" aria-label="Previous year">‹</button>
+            <span id="month-year" aria-live="polite"></span>
+            <button id="next-year" type="button" aria-label="Next year">›</button>
+          </div>
+          <div id="month-options"></div>
+        </div>
+        <div class="range-actions">
+          <button id="apply-range" type="button">Apply date range</button>
+          <button id="clear-range" class="quiet text-link" type="button" hidden>Clear range</button>
+        </div>
+        <p id="range-status" class="meta" aria-live="polite" hidden></p>
+      </details>
+    </fieldset>
+    <p id="picker-status" class="meta" role="status"></p>
+  </div>
+  <div class="picker-actions">
+    <button id="add-questions" type="button">Add to worksheet</button>
+    <button id="select-questions" class="primary" type="button">Select</button>
+  </div>
+</section>
+<main id="print-view" hidden>
+  <div class="print-actions">
+    <div class="toolbar">
+      <button id="back">Back to database</button>
+      <button id="switch-print">Switch to answer key</button>
+      <label class="title-option"><input id="include-title" type="checkbox"> Include title</label>
+    </div>
+    <div class="toolbar">
+      <span id="print-selection-count" class="meta" role="status"></span>
+      <button id="print" class="primary">Print</button>
+    </div>
+    <label id="title-field" hidden>Title: <input id="title-input" type="text"></label>
+  </div>
+  <p id="print-title" hidden></p>
+  <div id="print-questions"></div>
+</main>
+<dialog id="question-detail-dialog" aria-labelledby="question-detail-title">
+  <div class="picker-heading">
+    <h2 id="question-detail-title"></h2>
+    <button id="close-question-detail" class="quiet" type="button" aria-label="Close question details">×</button>
+  </div>
+  <div id="question-detail-content" class="question-metadata"></div>
+</dialog>
+</body>
+</html>
