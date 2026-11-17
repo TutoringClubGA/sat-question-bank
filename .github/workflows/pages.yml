@@ -26,9 +26,10 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      BANK_TMP: ${{ runner.temp }}/sat-bank
       STATE_TAG: sat-bank-state
     steps:
+      - name: Set database workspace
+        run: echo "BANK_TMP=$RUNNER_TEMP/sat-bank" >> "$GITHUB_ENV"
       - uses: actions/checkout@v6
         with:
           ref: main
