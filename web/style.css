@@ -16,7 +16,8 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; }
-.app-version { position: fixed; inset: .4rem .55rem auto auto; color: var(--muted); font-size: .62rem; line-height: 1; pointer-events: none; }
+.app-version { position: fixed; inset: .4rem .55rem auto auto; display: flex; align-items: baseline; gap: .4rem; color: var(--muted); font-size: .62rem; line-height: 1; pointer-events: none; }
+.app-version a { pointer-events: auto; }
 main { width: calc(100% - 2rem); margin: 0 auto; padding: 2rem 0 5rem; }
 #browser { max-width: var(--directory-width); margin-block: 1.25rem; padding: 0; }
 #browser:has(.worksheet-bar:not([hidden])) { margin-bottom: 5rem; }
