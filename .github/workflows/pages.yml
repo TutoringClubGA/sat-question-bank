@@ -1,0 +1,120 @@
+name: Refresh and publish SAT Question Bank
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 10 * * *'
+  workflow_dispatch:
+    inputs:
+      refresh:
+        description: Fetch the latest questions from College Board before publishing
+        type: boolean
+        default: true
+
+concurrency:
+  group: sat-question-bank-pages
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STATE_TAG: sat-bank-state
+    steps:
+      - name: Set database workspace
+        run: echo "BANK_TMP=$RUNNER_TEMP/sat-bank" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Restore database
+        shell: bash
+        run: |
+          mkdir -p "$BANK_TMP"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$STATE_TAG" > "$BANK_TMP/release.json" 2> "$BANK_TMP/release-error"; then
+            latest=$(jq -r '[.assets[] | select(.state == "uploaded" and (.name == "snapshot-a.sqlite3.gz" or .name == "snapshot-b.sqlite3.gz"))] | max_by(.created_at).name // empty' "$BANK_TMP/release.json")
+            if [[ -z "$latest" ]]; then
+              echo "The database release has no complete snapshot."
+              exit 1
+            fi
+            gh release download "$STATE_TAG" --pattern "$latest" --output "$BANK_TMP/snapshot.gz"
+            gzip -dc "$BANK_TMP/snapshot.gz" > "$BANK_TMP/sat.sqlite3"
+            printf '%s\n' "$latest" > "$BANK_TMP/active-asset"
+          elif grep -q 'HTTP 404)' "$BANK_TMP/release-error"; then
+            gzip -dc data/seed.sqlite3.gz > "$BANK_TMP/sat.sqlite3"
+          else
+            cat "$BANK_TMP/release-error" >&2
+            exit 1
+          fi
+      - name: Refresh question bank
+        if: github.event_name == 'schedule' || inputs.refresh
+        run: python import_bank.py --db "$BANK_TMP/sat.sqlite3" --json > "$BANK_TMP/refresh.json"
+      - name: Build the Pages site
+        run: python export_site.py --db "$BANK_TMP/sat.sqlite3" --output "$BANK_TMP/site"
+      - name: Save the refreshed database
+        if: github.event_name == 'schedule' || inputs.refresh
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import sqlite3
+
+          root = Path(os.environ["BANK_TMP"])
+          with sqlite3.connect(root / "sat.sqlite3") as source, sqlite3.connect(root / "snapshot.sqlite3") as target:
+              source.backup(target)
+              if target.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                  raise ValueError("The refreshed database did not pass its integrity check.")
+          PY
+          slot=snapshot-a.sqlite3.gz
+          if [[ -f "$BANK_TMP/active-asset" ]] && [[ "$(cat "$BANK_TMP/active-asset")" == "$slot" ]]; then
+            slot=snapshot-b.sqlite3.gz
+          fi
+          gzip -nc "$BANK_TMP/snapshot.sqlite3" > "$BANK_TMP/$slot"
+          if [[ -f "$BANK_TMP/active-asset" ]]; then
+            gh release upload "$STATE_TAG" "$BANK_TMP/$slot" --clobber
+          else
+            gh release create "$STATE_TAG" "$BANK_TMP/$slot" --target "$(git rev-parse HEAD)" \
+              --prerelease --title "SAT Question Bank database snapshots" \
+              --notes "SQLite snapshots used by the daily question-bank refresh."
+          fi
+      - name: Record the refresh in the repository
+        if: github.event_name == 'schedule' || inputs.refresh
+        continue-on-error: true
+        shell: bash
+        run: |
+          jq '{observed_at, listed, totals}' "$BANK_TMP/refresh.json" > data/last-refresh.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/last-refresh.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Record daily question bank refresh"
+            git push origin HEAD:main
+          fi
+      - name: Upload the Pages build
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ env.BANK_TMP }}/site
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
