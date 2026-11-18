@@ -196,7 +196,7 @@ function buildDirectory() {
   }
 }
 
-const sectionButtons = document.querySelectorAll(".section-switcher button");
+const sectionButtons = document.querySelectorAll(".section-switcher button[aria-pressed]");
 function showSection(id) {
   for (const button of sectionButtons) {
     const sectionId = button.getAttribute("aria-controls");
@@ -385,12 +385,12 @@ function updateReleaseFilter(state, ids) {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(row.question_id);
     }
-    releaseFilter = {chosen, range, groups, summary: releaseMonthSummary(state)};
+    releaseFilter = {chosen, range, groups, ...releaseMonthSummaries(state)};
   }
   renderReleaseFilter();
 }
 
-function releaseMonthSummary({chosen, sources, range, rows}) {
+function releaseMonthSummaries({chosen, sources, range, rows}) {
   const months = new Set([...chosen].filter((key) => /^\d{4}-\d{2}$/.test(key)));
   if (chosen.has("john")) months.add(latestRelease.slice(0, 7));
   const historicalIds = new Set(["older", "thomas"].filter((key) => chosen.has(key))
@@ -398,7 +398,8 @@ function releaseMonthSummary({chosen, sources, range, rows}) {
   for (const row of rows) {
     if (row.catalog_date && historicalIds.has(row.question_id)) months.add(row.catalog_date.slice(0, 7));
   }
-  const spans = [...months].map((month) => [month, month]);
+  const spans = [...months].filter((month) => !range || month < range.from || month > range.through)
+    .map((month) => [month, month]);
   if (range) spans.push([range.from, range.through]);
   const merged = [];
   function monthIndex(month) {
@@ -410,13 +411,16 @@ function releaseMonthSummary({chosen, sources, range, rows}) {
     if (!previous || monthIndex(start) > monthIndex(previous[1]) + 1) merged.push([start, end]);
     else if (end > previous[1]) previous[1] = end;
   }
-  const labels = merged.map(([start, end]) => {
+  function spanLabel([start, end]) {
     if (start === end) return monthLabel(start);
     const sameYear = start.slice(0, 4) === end.slice(0, 4);
     const first = sameYear ? monthName.format(new Date(start + "-01T00:00:00Z")) : monthLabel(start);
     return `${first} – ${monthLabel(end)}`;
-  });
-  return labels.join(", ");
+  }
+  return {
+    summary: merged.map(spanLabel).join(", "),
+    checklistSummary: spans.map(spanLabel).join(", ") || [...chosen].map((key) => sources.get(key).label).join(", "),
+  };
 }
 
 function renderReleaseFilter() {
@@ -439,6 +443,54 @@ function renderReleaseFilter() {
   const months = releaseFilter?.summary;
   summary.textContent = months ? `Showing ${months}` : "No release filter";
   summary.title = months ? summary.textContent : "";
+}
+
+function cloneChecklistGroup(group) {
+  const copy = group.cloneNode(true);
+  for (const row of copy.querySelectorAll(".difficulty-list li")) {
+    if (row.classList.contains("no-matches")) {
+      row.remove();
+      continue;
+    }
+    const label = element("span", row.querySelector("button").textContent, "text-link");
+    row.className = "checklist-entry";
+    row.replaceChildren(label, element("span", "", "checklist-box"), element("span", "", "checklist-date-line"));
+  }
+  for (const skill of copy.querySelectorAll(".skill")) {
+    if (!skill.querySelector("li")) skill.remove();
+  }
+  for (const domain of copy.querySelectorAll(".domain")) {
+    if (!domain.querySelector("li")) domain.remove();
+  }
+  return copy;
+}
+
+function buildChecklistPages(subjects, student) {
+  const printedDate = new Intl.DateTimeFormat("en-US", {dateStyle: "long"}).format(new Date());
+  const months = releaseFilter?.checklistSummary || "All releases";
+  const sheets = [];
+  for (const {id, name} of directory) {
+    if (!subjects.includes(id)) continue;
+    const groups = [...byId(id).children].slice(1).map(cloneChecklistGroup);
+    for (let index = 0; index < groups.length; index += 2) {
+      const matches = groups.slice(index, index + 2).filter((group) => group.querySelector("li"));
+      if (!matches.length) continue;
+      const heading = element("header", "", "directory-header");
+      const metadata = element("p", "", "checklist-metadata");
+      for (const [label, value] of [["Student:", student], ["Date:", printedDate]]) {
+        const item = element("span");
+        item.append(element("strong", label), " " + value);
+        metadata.append(item);
+      }
+      heading.append(element("h1", "SAT Question Bank Checklist"), element("p", months, "checklist-releases"), metadata);
+      const section = element("section", "", "bank-section");
+      section.append(element("h2", name), ...matches);
+      const sheet = element("article", "", "directory-document checklist-sheet");
+      sheet.append(heading, section);
+      sheets.push(sheet);
+    }
+  }
+  return sheets;
 }
 
 function positionPicker() {
@@ -1004,6 +1056,64 @@ byId("switch-print").addEventListener("click", async (event) => {
 });
 byId("print").addEventListener("click", () => window.print());
 byId("close-question-detail").addEventListener("click", () => byId("question-detail-dialog").close());
+
+const checklistDialog = byId("checklist-dialog");
+const checklistForm = byId("checklist-form");
+const checklistStudent = byId("checklist-student");
+const checklistSubmit = byId("submit-checklist");
+const checklistPages = byId("checklist-pages");
+
+function showChecklistStatus(message = "") {
+  const status = byId("checklist-status");
+  status.textContent = message;
+  status.hidden = !message;
+}
+
+byId("open-checklist").addEventListener("click", async () => {
+  if (preparingPrint) return;
+  closePicker(false);
+  checklistForm.reset();
+  checklistSubmit.disabled = true;
+  showChecklistStatus("Loading releases…");
+  checklistDialog.showModal();
+  try {
+    await loadReleaseRows();
+    checklistSubmit.disabled = false;
+    showChecklistStatus();
+  } catch (error) {
+    showChecklistStatus(error.message);
+  }
+});
+byId("cancel-checklist").addEventListener("click", () => checklistDialog.close());
+checklistForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (checklistSubmit.disabled) return;
+  const student = checklistStudent.value.trim();
+  if (!student) {
+    showChecklistStatus("Enter the student's name.");
+    checklistStudent.focus();
+    return;
+  }
+  const subjects = new FormData(checklistForm).getAll("subject");
+  if (!subjects.length) {
+    showChecklistStatus("Select at least one subject.");
+    checklistForm.elements.subject[0].focus();
+    return;
+  }
+  const sheets = buildChecklistPages(subjects, student);
+  if (!sheets.length) {
+    showChecklistStatus("No categories match the release filter for the selected subjects.");
+    return;
+  }
+  checklistPages.replaceChildren(...sheets);
+  checklistPages.hidden = false;
+  checklistDialog.close();
+  window.print();
+});
+window.addEventListener("afterprint", () => {
+  checklistPages.hidden = true;
+  checklistPages.replaceChildren();
+});
 
 function sectionFromUrl() {
   const id = window.location.hash.slice(1);

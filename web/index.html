@@ -5,15 +5,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SAT Practice Question Bank Database</title>
-<link rel="stylesheet" href="./style.css">
-<script src="./app.js" defer></script>
+<link rel="stylesheet" href="./style.css?v=1.18">
+<script src="./app.js?v=1.18" defer></script>
 </head>
 <body>
-<small class="app-version">v1.17 <a href="https://github.com/johnhippisley/sat-question-bank">Link to repo</a></small>
+<small class="app-version">v1.18 <a href="https://github.com/johnhippisley/sat-question-bank">Link to repo</a></small>
 <main id="browser">
   <nav class="section-switcher" aria-label="SAT question bank">
     <button type="button" aria-controls="reading-writing" aria-pressed="true">Reading &amp; Writing</button>
     <button type="button" aria-controls="math" aria-pressed="false">Math</button>
+    <button id="open-checklist" type="button" aria-haspopup="dialog" aria-controls="checklist-dialog">Print checklist</button>
     <button id="open-statistics" type="button" aria-controls="statistics" aria-pressed="false">Database statistics</button>
   </nav>
   <div class="directory-document">
@@ -113,6 +114,24 @@
   <p id="print-title" hidden></p>
   <div id="print-questions"></div>
 </main>
+<div id="checklist-pages" hidden></div>
+<dialog id="checklist-dialog" aria-labelledby="checklist-dialog-title">
+  <form id="checklist-form">
+    <h2 id="checklist-dialog-title">Print checklist</h2>
+    <label class="checklist-name" for="checklist-student">Student name</label>
+    <input id="checklist-student" type="text" autocomplete="off" required autofocus>
+    <fieldset>
+      <legend>Include</legend>
+      <label><input type="checkbox" name="subject" value="reading-writing" checked> Reading &amp; Writing</label>
+      <label><input type="checkbox" name="subject" value="math" checked> Math</label>
+    </fieldset>
+    <p id="checklist-status" class="meta" role="status" hidden></p>
+    <div class="checklist-actions">
+      <button id="cancel-checklist" type="button">Cancel</button>
+      <button id="submit-checklist" class="primary" type="submit">Print</button>
+    </div>
+  </form>
+</dialog>
 <dialog id="question-detail-dialog" aria-labelledby="question-detail-title">
   <div class="picker-heading">
     <h2 id="question-detail-title"></h2>
