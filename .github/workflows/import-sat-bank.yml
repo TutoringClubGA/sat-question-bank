@@ -1,0 +1,74 @@
+name: Import SAT Question Bank from John Hippisley
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/import-sat-bank.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-sat-bank
+  cancel-in-progress: false
+
+jobs:
+  import:
+    if: github.repository == 'TutoringClubGA/sat-question-bank'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE: johnhippisley/sat-question-bank
+      SOURCE_HEAD: 04a447d39ee2593cb00db7fa0311a903b4672ba5
+      STATE_TAG: sat-bank-state
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Verify source history and snapshots
+        shell: bash
+        run: |
+          git remote add source "https://github.com/$SOURCE.git"
+          git fetch --no-tags source refs/heads/main:refs/remotes/source/main "refs/tags/$STATE_TAG:refs/tags/$STATE_TAG"
+          git merge-base --is-ancestor "$SOURCE_HEAD" refs/remotes/source/main
+          mkdir -p "$RUNNER_TEMP/sat-bank-state"
+          cd "$RUNNER_TEMP/sat-bank-state"
+          base="https://github.com/$SOURCE/releases/download/$STATE_TAG"
+          for slot in a b; do
+            file="snapshot-$slot.sqlite3.gz"
+            curl --fail --location --silent --show-error --retry 3 "$base/$file" --output "$file"
+          done
+          cat <<'CHECKSUMS' | sha256sum --check
+          682d0d3a96c1744b381623cd902d76f5b8296f7d4dd00b78e59b95bcd2615079  snapshot-a.sqlite3.gz
+          b1a8cfb4b17dae2683850e7396d1771841f9b0fea93e83f4745cefdb7d5e8233  snapshot-b.sqlite3.gz
+          CHECKSUMS
+      - name: Stage the imported source and build the site
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch --detach "$SOURCE_HEAD"
+          git merge --allow-unrelated-histories --strategy=ours --no-commit "$GITHUB_SHA"
+          git show "$GITHUB_SHA:.github/workflows/import-sat-bank.yml" > .github/workflows/import-sat-bank.yml
+          sed -i "s#https://github.com/$SOURCE#https://github.com/$GITHUB_REPOSITORY#g" web/index.html
+          git add .github/workflows/import-sat-bank.yml web/index.html
+          git commit -m 'Migrate SAT Question Bank to Tutoring Club'
+          git merge-base --is-ancestor "$SOURCE_HEAD" HEAD
+          git merge-base --is-ancestor "$GITHUB_SHA" HEAD
+          gzip -dc "$RUNNER_TEMP/sat-bank-state/snapshot-b.sqlite3.gz" > "$RUNNER_TEMP/sat-bank-state/sat.sqlite3"
+          python3 export_site.py --db "$RUNNER_TEMP/sat-bank-state/sat.sqlite3" --output "$RUNNER_TEMP/sat-bank-site"
+      - name: Push source history and copy the database release
+        shell: bash
+        run: |
+          git push --atomic origin HEAD:refs/heads/main "refs/tags/$STATE_TAG:refs/tags/$STATE_TAG"
+          cd "$RUNNER_TEMP/sat-bank-state"
+          gh release create "$STATE_TAG" snapshot-a.sqlite3.gz --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --prerelease --title "SAT Question Bank database snapshots" \
+            --notes "SQLite snapshots used by the daily question-bank refresh."
+          sleep 2
+          gh release upload "$STATE_TAG" snapshot-b.sqlite3.gz --repo "$GITHUB_REPOSITORY"
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$STATE_TAG" \
+            --jq '[.assets[] | select(.state == "uploaded")] | max_by(.created_at).name')
+          test "$latest" = snapshot-b.sqlite3.gz
