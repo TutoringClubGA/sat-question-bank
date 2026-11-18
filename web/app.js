@@ -877,7 +877,7 @@ async function renderPrint(session, answerKey) {
     }
   }
   byId("print-questions").replaceChildren(...content);
-  byId("switch-print").textContent = answerKey ? "Switch to Questions" : "Switch to answer key";
+  byId("switch-print").textContent = answerKey ? "Switch to questions" : "Switch to answer key";
   updatePrintCount(session);
 }
 
