@@ -103,7 +103,9 @@ function setDatabaseDate(id, timestamp) {
     const dayStart = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
     const changeStart = Date.parse(timestamp?.slice(0, 10) + "T00:00:00Z");
     const age = (dayStart - changeStart) / 86400000;
-    time.style.color = age >= 0 && age <= 7 ? "#18733b" : "";
+    const recent = age >= 0 && age <= 7;
+    time.parentElement.style.color = recent ? "#18733b" : "";
+    time.parentElement.style.fontWeight = recent ? "bold" : "";
   }
 }
 
