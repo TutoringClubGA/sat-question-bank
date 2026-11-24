@@ -60,7 +60,10 @@ const shortMonthFormat = new Intl.DateTimeFormat("en", {month: "short", timeZone
 const dayFormat = new Intl.DateTimeFormat("en", {dateStyle: "medium", timeZone: "UTC"});
 const timeFormat = new Intl.DateTimeFormat("en", {dateStyle: "medium", timeStyle: "medium", timeZone: "UTC"});
 const latestRelease = "2026-07-30";
-const defaultReleases = ["john", "2026-08"];
+function defaultReleases(sources) {
+  const latest = [...sources.keys()].filter((key) => /^\d{4}-\d{2}$/.test(key)).sort().at(-1);
+  return latest ? [latest] : sources.has("john") ? ["john"] : [];
+}
 const olderLabels = new Set(["Pre-July 2026", "Pre-July 2026 (catalog date)"]);
 
 function day(iso) {
@@ -95,6 +98,13 @@ function setDatabaseDate(id, timestamp) {
   const time = byId(id);
   time.textContent = timestamp ? dayFormat.format(new Date(timestamp)) : "Unknown";
   if (timestamp) time.dateTime = timestamp;
+  if (id === "database-changed") {
+    const today = new Date();
+    const dayStart = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+    const changeStart = Date.parse(timestamp?.slice(0, 10) + "T00:00:00Z");
+    const age = (dayStart - changeStart) / 86400000;
+    time.style.color = age >= 0 && age <= 7 ? "#18733b" : "";
+  }
 }
 
 function element(tag, content, className) {
@@ -279,7 +289,7 @@ function loadReleaseRows() {
   if (!releaseRowsRequest) {
     releaseRowsRequest = get("/api/directory-releases").then(({questions: rows}) => {
       const sources = buildSources(rows);
-      const chosen = new Set(defaultReleases.filter((key) => sources.has(key)));
+      const chosen = new Set(defaultReleases(sources));
       const state = {rows, sources, chosen};
       updateReleaseFilter(state, releaseIds(state));
       return rows;
@@ -920,7 +930,7 @@ function worksheetItem(question, number, session, answerKey) {
 }
 
 async function renderPrint(session, answerKey) {
-  const ids = [...session.selection.keys()];
+  const ids = session.order ?? [...session.selection.keys()];
   const content = [];
   for (let index = 0; index < ids.length; index += 12) {
     const batch = await Promise.all(ids.slice(index, index + 12).map(getQuestion));
@@ -960,6 +970,8 @@ async function printSelection(selection, answers, requestedBy) {
     worksheetSession = session;
     printingAnswers = answers;
     byId("switch-print").hidden = requestedBy.id === "worksheet";
+    const shuffle = byId("shuffle-questions");
+    if (shuffle) shuffle.disabled = selection.size < 2;
     closePicker(false);
     byId("browser").hidden = true;
     byId("print-view").hidden = false;
@@ -1043,15 +1055,42 @@ byId("back").addEventListener("click", () => {
   returnTo?.focus();
 });
 byId("include-title").addEventListener("change", updatePrintTitle);
+byId("shuffle-questions")?.addEventListener("click", async () => {
+  const session = worksheetSession;
+  if (!session || session.selection.size < 2) return;
+  const button = byId("shuffle-questions");
+  const switchButton = byId("switch-print");
+  button.disabled = switchButton.disabled = byId("print").disabled = true;
+  const previous = session.order ?? [...session.selection.keys()];
+  const order = [...previous];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  if (order.every((id, i) => id === previous[i])) order.push(order.shift());
+  session.order = order;
+  try {
+    await renderPrint(session, printingAnswers);
+  } catch (error) {
+    session.order = previous;
+    showError(error);
+  } finally {
+    button.disabled = switchButton.disabled = false;
+    updatePrintCount(session);
+  }
+});
 byId("title-input").addEventListener("input", updatePrintTitle);
 byId("switch-print").addEventListener("click", async (event) => {
   const button = event.currentTarget;
   button.disabled = true;
+  const shuffle = byId("shuffle-questions");
+  if (shuffle) shuffle.disabled = true;
   try {
     await renderPrint(worksheetSession, !printingAnswers);
     printingAnswers = !printingAnswers;
   } finally {
     button.disabled = false;
+    if (shuffle) shuffle.disabled = worksheetSession.selection.size < 2;
   }
 });
 byId("print").addEventListener("click", () => window.print());
