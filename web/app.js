@@ -105,7 +105,6 @@ function setDatabaseDate(id, timestamp) {
     const age = (dayStart - changeStart) / 86400000;
     const recent = age >= 0 && age <= 7;
     time.parentElement.style.color = recent ? "#18733b" : "";
-    time.parentElement.style.fontWeight = recent ? "bold" : "";
   }
 }
 
