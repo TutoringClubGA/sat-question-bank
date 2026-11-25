@@ -1,6 +1,6 @@
 # SAT Question Bank
 
-Use Python 3.10 or newer. The importer and web app use the Python standard library. Run these commands from the extracted `sat-bank` folder.
+Use Python 3.10 or newer. The importer and web app use the Python standard library. To set up and instance, you can run these commands from the extracted `sat-bank` folder
 
 ```sh
 gzip -dc data/seed.sqlite3.gz > data/sat.sqlite3  # Run once when starting with a fresh checkout.
@@ -9,7 +9,9 @@ python3 backfill.py --catalog-pre-july
 python3 serve.py
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The importer and local server each default to `data/sat.sqlite3`. Pass `--db PATH` to use a different file. You can start the server immediately after unpacking the seed, and refresh the bank separately.
+and open [http://127.0.0.1:8000](http://127.0.0.1:8000). 
+
+The importer and local server each default to `data/sat.sqlite3`. Pass `--db PATH` to use a different file. You can start the server immediately after unpacking the seed, and refresh the bank separately.
 
 ## Import and update
 
