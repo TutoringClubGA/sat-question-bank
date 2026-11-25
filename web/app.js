@@ -965,12 +965,12 @@ async function printSelection(selection, answers, requestedBy) {
     byId("include-title").checked = false;
     byId("title-input").value = [...new Set([...selection.values()].map(({skill}) => skill))].join(", ");
     updatePrintTitle();
-    const session = {selection, excluded: new Set()};
+    const session = {selection, excluded: new Set(), order: [...selection.keys()]};
     await renderPrint(session, answers);
     if (returnTo !== origin) return;
     worksheetSession = session;
     printingAnswers = answers;
-    byId("switch-print").hidden = requestedBy.id === "worksheet";
+    byId("switch-print").hidden = false;
     const shuffle = byId("shuffle-questions");
     if (shuffle) shuffle.disabled = selection.size < 2;
     closePicker(false);
