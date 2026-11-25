@@ -1,6 +1,6 @@
 # SAT Question Bank
 
-Use Python 3.10 or newer. The importer and web app use the Python standard library. To set up and instance, you can run these commands from the extracted `sat-bank` folder
+Use Python 3.10 or newer. The importer and web app use the Python standard library. To set up an instance, you can run these commands from the extracted `sat-bank` folder
 
 ```sh
 gzip -dc data/seed.sqlite3.gz > data/sat.sqlite3  # Run once when starting with a fresh checkout.
